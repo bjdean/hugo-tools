@@ -262,4 +262,4 @@ Install dev dependencies: `pip install -e ".[dev]"`
 ## Support
 
 - Issues: https://github.com/bjdean/hugo-tools/issues
-- Email: bj@bjdean.id.au
+- Email: hugo-tools@bjdean.id.au

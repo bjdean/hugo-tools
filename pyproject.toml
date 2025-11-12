@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A comprehensive toolkit for managing Hugo static site content"
 readme = "README.md"
 authors = [
-    {name = "BJ Dean", email = "bj@bjdean.id.au"}
+    {name = "Brad Dean", email = "hugo-tools@bjdean.id.au"}
 ]
 license = {text = "MIT"}
 classifiers = [
