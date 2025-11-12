@@ -1,5 +1,5 @@
 """
-Hugo Tools - A comprehensive toolkit for managing Hugo static site content.
+Hugo Tools - A toolkit for managing Hugo sites.
 
 This package provides command-line tools for:
 - Synchronizing file modification times with frontmatter dates

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hugotools"
 version = "0.1.0"
-description = "A comprehensive toolkit for managing Hugo static site content"
+description = "A toolkit for managing Hugo sites"
 readme = "README.md"
 authors = [
     {name = "Brad Dean", email = "hugo-tools@bjdean.id.au"}

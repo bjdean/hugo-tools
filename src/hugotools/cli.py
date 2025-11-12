@@ -15,7 +15,7 @@ def main():
     """Main CLI entry point with subcommand routing."""
     parser = argparse.ArgumentParser(
         prog="hugotools",
-        description="A comprehensive toolkit for managing Hugo static site content",
+        description="A toolkit for managing Hugo sites",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:

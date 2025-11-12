@@ -1,6 +1,6 @@
 # Hugo Tools
 
-A comprehensive toolkit for managing Hugo static site content.
+A toolkit for managing Hugo sites.
 
 ## Features
 
