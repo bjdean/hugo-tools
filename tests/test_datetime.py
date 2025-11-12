@@ -115,5 +115,76 @@ No date field.
         assert errors == 0
 
 
+def test_datetime_run_with_args():
+    """Test running datetime command with arguments."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+date: 2023-06-15 14:30:00
+---
+
+Test content.
+"""
+        )
+
+        # Import here to avoid circular imports
+        from hugotools.commands.datetime import run
+
+        result = run(["--all", "--content-dir", str(content_dir), "--dry-run"])
+        assert result == 0
+
+
+def test_datetime_run_no_selection_error():
+    """Test that run() fails when no selection criteria provided."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.datetime import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_datetime_already_synchronized():
+    """Test posts that are already synchronized are skipped."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+date: 2023-06-15 14:30:00
+---
+
+Test content.
+"""
+        )
+
+        # Set file mtime to match the frontmatter date
+        target_time = datetime(2023, 6, 15, 14, 30, 0).timestamp()
+        os.utime(post_file, (target_time, target_time))
+
+        synchronizer = DatetimeSynchronizer(content_dir)
+        synchronizer.load_posts()
+
+        modified, skipped, errors = synchronizer.synchronize_datetimes(
+            synchronizer.posts, dry_run=False
+        )
+
+        # Should not modify already synchronized posts
+        assert modified == 0
+        assert skipped == 0
+        assert errors == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

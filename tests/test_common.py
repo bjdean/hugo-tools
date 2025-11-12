@@ -371,5 +371,287 @@ Content
         assert "JSON Post" in titles
 
 
+def test_hugo_post_yaml_parse_error():
+    """Test handling of invalid YAML frontmatter."""
+    content = """---
+title: Test Post
+date: [invalid yaml structure
+---
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        # Should not crash, just have empty frontmatter
+        post = HugoPost(temp_path)
+        assert post.has_frontmatter
+        assert post.frontmatter == {}
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_toml_parse_error():
+    """Test handling of invalid TOML frontmatter."""
+    content = """+++
+title = "Test Post"
+date = [invalid toml structure
++++
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        # Should not crash, just have empty frontmatter
+        post = HugoPost(temp_path)
+        assert post.has_frontmatter
+        assert post.frontmatter == {}
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_json_parse_error():
+    """Test handling of invalid JSON frontmatter."""
+    content = """{
+  "title": "Test Post",
+  "date": "2023-01-15",
+  "invalid": missing quotes and comma
+}
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        # Should not crash, just have empty frontmatter
+        post = HugoPost(temp_path)
+        assert post.has_frontmatter
+        assert post.frontmatter_format == "json"
+        assert post.frontmatter == {}
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_filter_by_path():
+    """Test filtering posts by exact path."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post1 = content_dir / "post1.md"
+        post1.write_text(
+            """---
+title: Post 1
+---
+Content
+"""
+        )
+        post2 = content_dir / "post2.md"
+        post2.write_text(
+            """---
+title: Post 2
+---
+Content
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Filter by path
+        filtered = manager.filter_posts(paths=[str(post1)])
+        assert len(filtered) == 1
+        assert filtered[0].get_title() == "Post 1"
+
+
+def test_hugo_post_filter_path_not_found():
+    """Test filtering with non-existent path."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post1 = content_dir / "post1.md"
+        post1.write_text(
+            """---
+title: Post 1
+---
+Content
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Filter by non-existent path
+        filtered = manager.filter_posts(paths=["/nonexistent/path.md"])
+        assert len(filtered) == 0
+
+
+def test_hugo_post_get_date_various_formats():
+    """Test parsing various date formats."""
+    # ISO format with timezone
+    content = """---
+title: Test Post
+date: 2023-01-15T10:30:00+00:00
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        date = post.get_date()
+        assert date is not None
+        assert date.year == 2023
+        assert date.month == 1
+        assert date.day == 15
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_get_date_invalid():
+    """Test handling of invalid date format."""
+    content = """---
+title: Test Post
+date: not-a-date
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        date = post.get_date()
+        assert date is None
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_metadata_list_single_value():
+    """Test get_metadata_list with a single string value."""
+    content = """---
+title: Test Post
+category: Single
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        # get_metadata_list should convert single value to list
+        categories = post.get_metadata_list("category")
+        assert categories == ["Single"]
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_metadata_list_empty():
+    """Test get_metadata_list with missing field."""
+    content = """---
+title: Test Post
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        tags = post.get_metadata_list("tags")
+        assert tags == []
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_set_metadata_list_empty():
+    """Test setting metadata list to empty removes the field."""
+    content = """---
+title: Test Post
+tags:
+  - python
+  - tutorial
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        post.set_metadata_list("tags", [])
+        post.save()
+
+        # Re-read and verify field is removed
+        post2 = HugoPost(temp_path)
+        assert "tags" not in post2.frontmatter
+    finally:
+        temp_path.unlink()
+
+
+def test_parse_date_invalid_format():
+    """Test parse_date with invalid format."""
+    from hugotools.common import parse_date
+
+    with pytest.raises(Exception):  # ArgumentTypeError
+        parse_date("2023/01/01")
+
+
+def test_hugo_post_filter_combined():
+    """Test filtering with multiple criteria."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        (content_dir / "post1.md").write_text(
+            """---
+title: Python Tutorial 2023
+date: 2023-06-15
+---
+Learn Python programming.
+"""
+        )
+        (content_dir / "post2.md").write_text(
+            """---
+title: JavaScript Guide 2023
+date: 2023-06-20
+---
+Learn JavaScript.
+"""
+        )
+        (content_dir / "post3.md").write_text(
+            """---
+title: Python Advanced
+date: 2020-01-01
+---
+Advanced Python.
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Filter by title and date
+        from_date = datetime(2023, 1, 1)
+        filtered = manager.filter_posts(title_pattern="python", from_date=from_date)
+        assert len(filtered) == 1
+        assert filtered[0].get_title() == "Python Tutorial 2023"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
