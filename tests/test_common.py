@@ -653,5 +653,150 @@ Advanced Python.
         assert filtered[0].get_title() == "Python Tutorial 2023"
 
 
+def test_hugo_post_manager_nonexistent_directory():
+    """Test loading posts from non-existent directory."""
+    content_dir = Path("/nonexistent/directory/path")
+    manager = HugoPostManager(content_dir)
+
+    with pytest.raises(SystemExit) as exc_info:
+        manager.load_posts()
+    assert exc_info.value.code == 1
+
+
+def test_hugo_post_get_metadata_list_dict():
+    """Test get_metadata_list with non-list, non-string value (returns empty)."""
+    content = """---
+title: Test Post
+metadata: {key: value}
+---
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        # get_metadata_list should return empty for dict values
+        result = post.get_metadata_list("metadata")
+        assert result == []
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_get_full_text():
+    """Test get_full_text method."""
+    content = """---
+title: Test Post
+tags:
+  - python
+---
+
+Post content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        full_text = post.get_full_text()
+        assert "title: Test Post" in full_text
+        assert "python" in full_text
+        assert "Post content here" in full_text
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_save_toml_with_datetime():
+    """Test saving TOML with datetime conversion."""
+    content = """+++
+title = "Test Post"
+date = 2023-01-15T10:30:00Z
++++
+
+Content
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+        # Modify and save
+        post.set_metadata_list("tags", ["python"])
+        post.save()
+
+        # Re-read and verify
+        saved_content = temp_path.read_text()
+        assert "+++" in saved_content
+        assert "python" in saved_content
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_filter_text_pattern():
+    """Test filtering by text content."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        (content_dir / "post1.md").write_text(
+            """---
+title: Post 1
+---
+This post discusses machine learning.
+"""
+        )
+        (content_dir / "post2.md").write_text(
+            """---
+title: Post 2
+---
+This is about web development.
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Filter by text content
+        filtered = manager.filter_posts(text_pattern="machine learning")
+        assert len(filtered) == 1
+        assert filtered[0].get_title() == "Post 1"
+
+
+def test_hugo_post_filter_to_date():
+    """Test filtering with to_date."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        (content_dir / "old.md").write_text(
+            """---
+title: Old Post
+date: 2020-01-01
+---
+Content
+"""
+        )
+        (content_dir / "new.md").write_text(
+            """---
+title: New Post
+date: 2023-12-31
+---
+Content
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Filter by to_date
+        to_date = datetime(2022, 1, 1)
+        filtered = manager.filter_posts(to_date=to_date)
+        assert len(filtered) == 1
+        assert filtered[0].get_title() == "Old Post"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -328,5 +328,122 @@ Content.
         assert result == 0
 
 
+def test_tag_run_conflicting_field_options():
+    """Test error when multiple field options are specified."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--all", "--categories", "--custom-list", "keywords", "--add", "test", "--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_tag_run_label_with_add_error():
+    """Test error when using --add with label field."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--all", "--custom-label", "status", "--add", "published", "--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_tag_run_list_with_set_error():
+    """Test error when using --set with list field."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--all", "--set", "value", "--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_tag_run_dump_with_add_error():
+    """Test error when using --dump with --add."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--all", "--dump", "--add", "test", "--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_tag_run_no_operation_error():
+    """Test error when no operation is specified."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--all", "--content-dir", str(content_dir)])
+        assert exc_info.value.code != 0
+
+
+def test_tag_dump_with_empty_values():
+    """Test dump mode with posts that have empty tag values."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+---
+
+Content without tags.
+"""
+        )
+
+        from hugotools.commands.tag import run
+
+        # Should handle empty/missing values gracefully
+        result = run(["--all", "--dump", "--content-dir", str(content_dir)])
+        assert result == 0
+
+
+def test_tag_dump_label_with_missing_values():
+    """Test dump mode for label field with some posts missing the field."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        (content_dir / "with-author.md").write_text(
+            """---
+title: Post With Author
+author: John Doe
+---
+Content
+"""
+        )
+        (content_dir / "without-author.md").write_text(
+            """---
+title: Post Without Author
+---
+Content
+"""
+        )
+
+        from hugotools.commands.tag import run
+
+        # Should handle missing values gracefully
+        result = run(["--all", "--custom-label", "author", "--dump", "--content-dir", str(content_dir)])
+        assert result == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

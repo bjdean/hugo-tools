@@ -186,5 +186,30 @@ Test content.
         assert errors == 0
 
 
+def test_datetime_empty_selection():
+    """Test handling when no posts match selection criteria."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        # Create a post
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+date: 2023-06-15 14:30:00
+---
+
+Test content.
+"""
+        )
+
+        from hugotools.commands.datetime import run
+
+        # Filter for non-existent title
+        result = run(["--title", "NonExistent", "--content-dir", str(content_dir)])
+        assert result == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
