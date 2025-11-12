@@ -28,6 +28,8 @@ keywords = ["hugo", "static-site", "markdown", "wordpress", "cms"]
 requires-python = ">=3.8"
 dependencies = [
     "PyYAML>=6.0",
+    "tomli>=2.0.0; python_version < '3.11'",
+    "tomli-w>=1.0.0",
     "beautifulsoup4>=4.9.0",
     "markdownify>=0.11.0",
 ]

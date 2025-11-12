@@ -193,5 +193,183 @@ Content
         assert filtered[0].get_title() == "New Post"
 
 
+def test_hugo_post_toml_parsing():
+    """Test parsing a Hugo post with TOML frontmatter."""
+    content = """+++
+title = "Test TOML Post"
+date = 2023-01-15T10:30:00Z
+tags = ["python", "testing"]
+categories = ["Technology"]
++++
+
+This is the post content with TOML frontmatter.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        assert post.has_frontmatter
+        assert post.frontmatter_format == "toml"
+        assert post.get_title() == "Test TOML Post"
+        assert post.get_metadata_list("tags") == ["python", "testing"]
+        assert post.get_metadata_list("categories") == ["Technology"]
+        assert "This is the post content with TOML frontmatter." in post.content
+
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_json_parsing():
+    """Test parsing a Hugo post with JSON frontmatter."""
+    content = """{
+  "title": "Test JSON Post",
+  "date": "2023-01-15T10:30:00Z",
+  "tags": ["python", "testing"],
+  "categories": ["Technology"]
+}
+
+This is the post content with JSON frontmatter.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        assert post.has_frontmatter
+        assert post.frontmatter_format == "json"
+        assert post.get_title() == "Test JSON Post"
+        assert post.get_metadata_list("tags") == ["python", "testing"]
+        assert post.get_metadata_list("categories") == ["Technology"]
+        assert "This is the post content with JSON frontmatter." in post.content
+
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_toml_save_preserves_format():
+    """Test that saving a TOML post preserves the TOML format."""
+    content = """+++
+title = "Test TOML Post"
+tags = ["original"]
++++
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        # Modify tags
+        tags = post.get_metadata_list("tags")
+        tags.append("new-tag")
+        post.set_metadata_list("tags", tags)
+        post.save()
+
+        # Re-read and verify format is preserved
+        saved_content = temp_path.read_text()
+        assert saved_content.startswith("+++")
+        assert "+++" in saved_content[3:]  # Check closing delimiter
+
+        # Verify content is correct
+        post2 = HugoPost(temp_path)
+        assert post2.frontmatter_format == "toml"
+        assert "original" in post2.get_metadata_list("tags")
+        assert "new-tag" in post2.get_metadata_list("tags")
+
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_json_save_preserves_format():
+    """Test that saving a JSON post preserves the JSON format."""
+    content = """{
+  "title": "Test JSON Post",
+  "tags": ["original"]
+}
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        # Modify tags
+        tags = post.get_metadata_list("tags")
+        tags.append("new-tag")
+        post.set_metadata_list("tags", tags)
+        post.save()
+
+        # Re-read and verify format is preserved
+        saved_content = temp_path.read_text()
+        assert saved_content.startswith("{")
+
+        # Verify content is correct
+        post2 = HugoPost(temp_path)
+        assert post2.frontmatter_format == "json"
+        assert "original" in post2.get_metadata_list("tags")
+        assert "new-tag" in post2.get_metadata_list("tags")
+
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_manager_loading_mixed_formats():
+    """Test loading posts with different frontmatter formats."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        # Create YAML post
+        (content_dir / "yaml-post.md").write_text(
+            """---
+title: YAML Post
+date: 2023-01-01
+---
+Content
+"""
+        )
+
+        # Create TOML post
+        (content_dir / "toml-post.md").write_text(
+            """+++
+title = "TOML Post"
+date = 2023-01-02
++++
+Content
+"""
+        )
+
+        # Create JSON post
+        (content_dir / "json-post.md").write_text(
+            """{
+  "title": "JSON Post",
+  "date": "2023-01-03"
+}
+Content
+"""
+        )
+
+        manager = HugoPostManager(content_dir)
+        manager.load_posts()
+
+        # Should load all three posts regardless of format
+        assert len(manager.posts) == 3
+        titles = [post.get_title() for post in manager.posts]
+        assert "YAML Post" in titles
+        assert "TOML Post" in titles
+        assert "JSON Post" in titles
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

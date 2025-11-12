@@ -6,6 +6,7 @@ Shared utilities for working with Hugo markdown post files.
 """
 
 import argparse
+import json
 import re
 import sys
 from datetime import datetime
@@ -13,6 +14,15 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
+
+# Import TOML library (tomllib for Python 3.11+, tomli for older versions)
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
+# Import TOML writer
+import tomli_w
 
 
 class HugoPost:
@@ -24,6 +34,7 @@ class HugoPost:
         self.content: str = ""
         self.frontmatter_raw: str = ""
         self.has_frontmatter: bool = False
+        self.frontmatter_format: str = "yaml"  # Track format: yaml, toml, or json
         self._parse()
 
     def _parse(self):
@@ -31,12 +42,13 @@ class HugoPost:
         with open(self.file_path, encoding="utf-8") as f:
             text = f.read()
 
-        # Match YAML frontmatter
-        pattern = r"^---\s*\n(.*?\n)---\s*\n(.*)$"
-        match = re.match(pattern, text, re.DOTALL)
+        # Try YAML frontmatter (delimited by ---)
+        yaml_pattern = r"^---\s*\n(.*?\n)---\s*\n(.*)$"
+        match = re.match(yaml_pattern, text, re.DOTALL)
 
         if match:
             self.has_frontmatter = True
+            self.frontmatter_format = "yaml"
             self.frontmatter_raw = match.group(1)
             self.content = match.group(2)
             try:
@@ -44,9 +56,42 @@ class HugoPost:
             except yaml.YAMLError as e:
                 print(f"Warning: Failed to parse YAML in {self.file_path}: {e}")
                 self.frontmatter = {}
-        else:
-            # No frontmatter found
-            self.content = text
+            return
+
+        # Try TOML frontmatter (delimited by +++)
+        toml_pattern = r"^\+\+\+\s*\n(.*?\n)\+\+\+\s*\n(.*)$"
+        match = re.match(toml_pattern, text, re.DOTALL)
+
+        if match:
+            self.has_frontmatter = True
+            self.frontmatter_format = "toml"
+            self.frontmatter_raw = match.group(1)
+            self.content = match.group(2)
+            try:
+                self.frontmatter = tomllib.loads(self.frontmatter_raw)
+            except Exception as e:
+                print(f"Warning: Failed to parse TOML in {self.file_path}: {e}")
+                self.frontmatter = {}
+            return
+
+        # Try JSON frontmatter (starts with { and ends with })
+        json_pattern = r"^(\{[\s\S]*?\n\})\s*\n(.*)$"
+        match = re.match(json_pattern, text, re.DOTALL)
+
+        if match:
+            self.has_frontmatter = True
+            self.frontmatter_format = "json"
+            self.frontmatter_raw = match.group(1)
+            self.content = match.group(2)
+            try:
+                self.frontmatter = json.loads(self.frontmatter_raw)
+            except json.JSONDecodeError as e:
+                print(f"Warning: Failed to parse JSON in {self.file_path}: {e}")
+                self.frontmatter = {}
+            return
+
+        # No frontmatter found
+        self.content = text
 
     def get_metadata_list(self, field: str) -> list:
         """Get a metadata field as a list (handles both single values and lists)."""
@@ -108,18 +153,50 @@ class HugoPost:
         return f"{self.frontmatter_raw}\n{self.content}"
 
     def save(self):
-        """Save the post back to disk."""
-        # Convert frontmatter back to YAML
-        yaml_str = yaml.dump(
-            self.frontmatter, default_flow_style=False, allow_unicode=True, sort_keys=False
-        )
+        """Save the post back to disk, preserving the original frontmatter format."""
+        # Serialize frontmatter based on the original format
+        if self.frontmatter_format == "yaml":
+            frontmatter_str = yaml.dump(
+                self.frontmatter, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
+            delimiter = "---"
+        elif self.frontmatter_format == "toml":
+            # Convert datetime objects to ISO format for TOML
+            frontmatter_copy = self._prepare_for_toml(self.frontmatter)
+            frontmatter_str = tomli_w.dumps(frontmatter_copy)
+            delimiter = "+++"
+        elif self.frontmatter_format == "json":
+            frontmatter_str = json.dumps(self.frontmatter, indent=2, ensure_ascii=False)
+            # JSON doesn't use delimiters in the same way - the braces are part of the JSON
+            # Write the file
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                f.write(frontmatter_str)
+                f.write("\n")
+                f.write(self.content)
+            return
+        else:
+            # Default to YAML if format is unknown
+            frontmatter_str = yaml.dump(
+                self.frontmatter, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
+            delimiter = "---"
 
-        # Write the file
+        # Write the file with delimiters
         with open(self.file_path, "w", encoding="utf-8") as f:
-            f.write("---\n")
-            f.write(yaml_str)
-            f.write("---\n")
+            f.write(f"{delimiter}\n")
+            f.write(frontmatter_str)
+            f.write(f"{delimiter}\n")
             f.write(self.content)
+
+    def _prepare_for_toml(self, data):
+        """Prepare data for TOML serialization by converting datetime objects."""
+        if isinstance(data, dict):
+            return {k: self._prepare_for_toml(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._prepare_for_toml(item) for item in data]
+        elif isinstance(data, datetime):
+            return data.isoformat()
+        return data
 
 
 class HugoPostManager:
