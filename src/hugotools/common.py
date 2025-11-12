@@ -8,9 +8,10 @@ Shared utilities for working with Hugo markdown post files.
 import argparse
 import re
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional, List
+from pathlib import Path
+from typing import Dict, List, Optional
+
 import yaml
 
 
@@ -27,11 +28,11 @@ class HugoPost:
 
     def _parse(self):
         """Parse the Hugo post file to extract frontmatter and content."""
-        with open(self.file_path, 'r', encoding='utf-8') as f:
+        with open(self.file_path, encoding="utf-8") as f:
             text = f.read()
 
         # Match YAML frontmatter
-        pattern = r'^---\s*\n(.*?\n)---\s*\n(.*)$'
+        pattern = r"^---\s*\n(.*?\n)---\s*\n(.*)$"
         match = re.match(pattern, text, re.DOTALL)
 
         if match:
@@ -83,21 +84,21 @@ class HugoPost:
 
     def get_title(self) -> str:
         """Get the post title."""
-        return self.frontmatter.get('title', '')
+        return self.frontmatter.get("title", "")
 
     def get_date(self) -> Optional[datetime]:
         """Get the post date."""
-        date_str = self.frontmatter.get('date', '')
+        date_str = self.frontmatter.get("date", "")
         if not date_str:
             return None
 
         # Try to parse various date formats
         date_str = str(date_str)
-        for fmt in ['%Y-%m-%d %H:%M:%S%z', '%Y-%m-%d', '%Y-%m-%dT%H:%M:%S%z']:
+        for fmt in ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z"]:
             try:
                 # Remove timezone info for simplicity
-                date_str_clean = date_str.split('+')[0].strip().strip("'\"")
-                return datetime.strptime(date_str_clean, fmt.split('%z')[0].strip())
+                date_str_clean = date_str.split("+")[0].strip().strip("'\"")
+                return datetime.strptime(date_str_clean, fmt.split("%z")[0].strip())
             except ValueError:
                 continue
         return None
@@ -109,20 +110,22 @@ class HugoPost:
     def save(self):
         """Save the post back to disk."""
         # Convert frontmatter back to YAML
-        yaml_str = yaml.dump(self.frontmatter, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        yaml_str = yaml.dump(
+            self.frontmatter, default_flow_style=False, allow_unicode=True, sort_keys=False
+        )
 
         # Write the file
-        with open(self.file_path, 'w', encoding='utf-8') as f:
-            f.write('---\n')
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            f.write("---\n")
             f.write(yaml_str)
-            f.write('---\n')
+            f.write("---\n")
             f.write(self.content)
 
 
 class HugoPostManager:
     """Base manager for Hugo posts with common loading and filtering functionality."""
 
-    def __init__(self, content_dir: Path = Path('content/posts')):
+    def __init__(self, content_dir: Path = Path("content/posts")):
         self.content_dir = content_dir
         self.posts: List[HugoPost] = []
 
@@ -133,20 +136,22 @@ class HugoPostManager:
             sys.exit(1)
 
         self.posts = []
-        for md_file in self.content_dir.glob('*.md'):
+        for md_file in self.content_dir.glob("*.md"):
             post = HugoPost(md_file)
             if post.has_frontmatter:
                 self.posts.append(post)
 
         print(f"Loaded {len(self.posts)} posts from {self.content_dir}")
 
-    def filter_posts(self,
-                     select_all: bool = False,
-                     title_pattern: Optional[str] = None,
-                     from_date: Optional[datetime] = None,
-                     to_date: Optional[datetime] = None,
-                     text_pattern: Optional[str] = None,
-                     paths: Optional[List[str]] = None) -> List[HugoPost]:
+    def filter_posts(
+        self,
+        select_all: bool = False,
+        title_pattern: Optional[str] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        text_pattern: Optional[str] = None,
+        paths: Optional[List[str]] = None,
+    ) -> List[HugoPost]:
         """Filter posts based on selection criteria."""
 
         if select_all:
@@ -197,9 +202,11 @@ class HugoPostManager:
 def parse_date(date_str: str) -> datetime:
     """Parse a date string in YYYY-MM-DD format."""
     try:
-        return datetime.strptime(date_str, '%Y-%m-%d')
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD")
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(
+            f"Invalid date format: {date_str}. Use YYYY-MM-DD"
+        ) from err
 
 
 def add_post_selection_args(parser: argparse.ArgumentParser, include_text: bool = True):
@@ -209,30 +216,49 @@ def add_post_selection_args(parser: argparse.ArgumentParser, include_text: bool 
         parser: The argument parser to add arguments to
         include_text: Whether to include the --text argument (default: True)
     """
-    selection = parser.add_argument_group('post selection')
-    selection.add_argument('--all', action='store_true',
-                          help='Select all posts')
-    selection.add_argument('--title', type=str, metavar='PATTERN',
-                          help='Select posts with title matching PATTERN')
-    selection.add_argument('--fromdate', type=parse_date, metavar='YYYY-MM-DD',
-                          help='Select posts from this date onwards')
-    selection.add_argument('--todate', type=parse_date, metavar='YYYY-MM-DD',
-                          help='Select posts up to this date')
+    selection = parser.add_argument_group("post selection")
+    selection.add_argument("--all", action="store_true", help="Select all posts")
+    selection.add_argument(
+        "--title", type=str, metavar="PATTERN", help="Select posts with title matching PATTERN"
+    )
+    selection.add_argument(
+        "--fromdate",
+        type=parse_date,
+        metavar="YYYY-MM-DD",
+        help="Select posts from this date onwards",
+    )
+    selection.add_argument(
+        "--todate", type=parse_date, metavar="YYYY-MM-DD", help="Select posts up to this date"
+    )
 
     if include_text:
-        selection.add_argument('--text', type=str, metavar='PATTERN',
-                              help='Select posts with PATTERN in header or content')
+        selection.add_argument(
+            "--text",
+            type=str,
+            metavar="PATTERN",
+            help="Select posts with PATTERN in header or content",
+        )
 
-    selection.add_argument('--path', type=str, nargs='+', metavar='PATH',
-                          help='Select posts by exact/relative file paths (one or more)')
+    selection.add_argument(
+        "--path",
+        type=str,
+        nargs="+",
+        metavar="PATH",
+        help="Select posts by exact/relative file paths (one or more)",
+    )
 
 
 def add_common_args(parser: argparse.ArgumentParser):
     """Add common arguments (dry-run, content-dir) to an argument parser."""
-    parser.add_argument('--dry-run', action='store_true',
-                       help='Show what would be changed without modifying files')
-    parser.add_argument('--content-dir', type=Path, default=Path('content/posts'),
-                       help='Path to Hugo content directory (default: content/posts)')
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be changed without modifying files"
+    )
+    parser.add_argument(
+        "--content-dir",
+        type=Path,
+        default=Path("content/posts"),
+        help="Path to Hugo content directory (default: content/posts)",
+    )
 
 
 def validate_post_selection_args(args, parser: argparse.ArgumentParser, include_text: bool = True):
@@ -249,6 +275,10 @@ def validate_post_selection_args(args, parser: argparse.ArgumentParser, include_
 
     if not any(options):
         if include_text:
-            parser.error("At least one post selection option is required (--all, --title, --fromdate, --todate, --text, --path)")
+            parser.error(
+                "At least one post selection option is required (--all, --title, --fromdate, --todate, --text, --path)"
+            )
         else:
-            parser.error("At least one post selection option is required (--all, --title, --fromdate, --todate, --path)")
+            parser.error(
+                "At least one post selection option is required (--all, --title, --fromdate, --todate, --path)"
+            )

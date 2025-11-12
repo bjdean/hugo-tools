@@ -9,16 +9,15 @@ Only modifies files when the datetime differs from the metadata.
 import argparse
 import os
 import sys
-from pathlib import Path
 from datetime import datetime
 from typing import List
 
 from hugotools.common import (
     HugoPost,
     HugoPostManager,
-    add_post_selection_args,
     add_common_args,
-    validate_post_selection_args
+    add_post_selection_args,
+    validate_post_selection_args,
 )
 
 
@@ -58,7 +57,7 @@ class DatetimeSynchronizer(HugoPostManager):
             print(f"{status}{post.file_path.name}:")
             print(f"  Frontmatter date: {post_date.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"  File mtime:       {file_mtime.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"  → Setting file mtime to match frontmatter date")
+            print("  → Setting file mtime to match frontmatter date")
 
             # Update file modification time if not dry run
             if not dry_run:
@@ -80,8 +79,8 @@ class DatetimeSynchronizer(HugoPostManager):
 def run(args=None):
     """Run the datetime synchronizer command."""
     parser = argparse.ArgumentParser(
-        prog='hugotools datetime',
-        description='Synchronize Hugo post file modification times with frontmatter dates',
+        prog="hugotools datetime",
+        description="Synchronize Hugo post file modification times with frontmatter dates",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -102,7 +101,7 @@ Examples:
 
   # Dry run to see what would change
   hugotools datetime --all --dry-run
-        """
+        """,
     )
 
     # Post selection (using common function, without --text since it's not useful for datetime sync)
@@ -117,7 +116,7 @@ Examples:
     validate_post_selection_args(parsed_args, parser, include_text=False)
 
     print(f"{'='*60}")
-    print(f"Hugo Post Datetime Synchronizer")
+    print("Hugo Post Datetime Synchronizer")
     print(f"{'='*60}")
     if parsed_args.dry_run:
         print("[DRY RUN MODE - No files will be modified]")
@@ -132,7 +131,7 @@ Examples:
         title_pattern=parsed_args.title,
         from_date=parsed_args.fromdate,
         to_date=parsed_args.todate,
-        paths=parsed_args.path
+        paths=parsed_args.path,
     )
 
     print(f"Selected {len(selected_posts)} posts")
@@ -144,8 +143,7 @@ Examples:
 
     # Synchronize datetimes
     modified_count, skipped_count, error_count = synchronizer.synchronize_datetimes(
-        selected_posts,
-        dry_run=parsed_args.dry_run
+        selected_posts, dry_run=parsed_args.dry_run
     )
 
     print()
@@ -166,5 +164,5 @@ Examples:
     return 0 if error_count == 0 else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(run())

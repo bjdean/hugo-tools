@@ -7,27 +7,28 @@ Manages tags and categories in Hugo markdown post files.
 
 import argparse
 import sys
-from pathlib import Path
-from typing import List, Set, Optional
+from typing import List, Optional, Set
 
 from hugotools.common import (
     HugoPost,
     HugoPostManager,
-    add_post_selection_args,
     add_common_args,
-    validate_post_selection_args
+    add_post_selection_args,
+    validate_post_selection_args,
 )
 
 
 class HugoTagManager(HugoPostManager):
     """Manages tags and categories in Hugo posts."""
 
-    def modify_metadata(self,
-                       posts: List[HugoPost],
-                       field: str,
-                       add_items: Set[str],
-                       remove_items: Set[str],
-                       dry_run: bool = False):
+    def modify_metadata(
+        self,
+        posts: List[HugoPost],
+        field: str,
+        add_items: Set[str],
+        remove_items: Set[str],
+        dry_run: bool = False,
+    ):
         """Add or remove tags/categories from posts."""
 
         modified_count = 0
@@ -69,12 +70,14 @@ class HugoTagManager(HugoPostManager):
 
         return modified_count
 
-    def modify_label(self,
-                    posts: List[HugoPost],
-                    field: str,
-                    set_value: Optional[str],
-                    remove: bool = False,
-                    dry_run: bool = False):
+    def modify_label(
+        self,
+        posts: List[HugoPost],
+        field: str,
+        set_value: Optional[str],
+        remove: bool = False,
+        dry_run: bool = False,
+    ):
         """Set or remove a single-value label field in posts."""
 
         modified_count = 0
@@ -116,7 +119,7 @@ class HugoTagManager(HugoPostManager):
         print(f"Dumping '{field}' from {len(posts)} posts")
         print(f"{'='*60}\n")
 
-        if field_type == 'list':
+        if field_type == "list":
             # For list fields, show all items
             all_values = set()
             for post in posts:
@@ -158,8 +161,8 @@ class HugoTagManager(HugoPostManager):
 def run(args=None):
     """Run the tag manager command."""
     parser = argparse.ArgumentParser(
-        prog='hugotools tag',
-        description='Manage tags and categories in Hugo posts',
+        prog="hugotools tag",
+        description="Manage tags and categories in Hugo posts",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -201,31 +204,54 @@ Examples:
 
   # Dry run to see what would change
   hugotools tag --all --add test --dry-run
-        """
+        """,
     )
 
     # Field selection
-    field_group = parser.add_argument_group('field selection (choose one)')
-    field_group.add_argument('--categories', action='store_true',
-                        help='Operate on categories instead of tags (default: tags)')
-    field_group.add_argument('--custom-list', type=str, metavar='FIELDNAME',
-                        help='Operate on a custom list field (e.g., keywords, authors)')
-    field_group.add_argument('--custom-label', type=str, metavar='FIELDNAME',
-                        help='Operate on a custom single-value field (e.g., status, series)')
+    field_group = parser.add_argument_group("field selection (choose one)")
+    field_group.add_argument(
+        "--categories",
+        action="store_true",
+        help="Operate on categories instead of tags (default: tags)",
+    )
+    field_group.add_argument(
+        "--custom-list",
+        type=str,
+        metavar="FIELDNAME",
+        help="Operate on a custom list field (e.g., keywords, authors)",
+    )
+    field_group.add_argument(
+        "--custom-label",
+        type=str,
+        metavar="FIELDNAME",
+        help="Operate on a custom single-value field (e.g., status, series)",
+    )
 
     # Post selection (using common function)
     add_post_selection_args(parser, include_text=True)
 
     # Operations
-    operations = parser.add_argument_group('operations')
-    operations.add_argument('--add', type=str, metavar='TAG[,TAG...]',
-                           help='Add items to list fields (comma-separated)')
-    operations.add_argument('--remove', type=str, metavar='TAG[,TAG...]',
-                           help='Remove items from list fields OR remove a label field entirely (comma-separated for lists)')
-    operations.add_argument('--set', type=str, metavar='VALUE',
-                           help='Set value for label fields (use with --custom-label)')
-    operations.add_argument('--dump', action='store_true',
-                           help='Report current values of the selected field without modifying')
+    operations = parser.add_argument_group("operations")
+    operations.add_argument(
+        "--add", type=str, metavar="TAG[,TAG...]", help="Add items to list fields (comma-separated)"
+    )
+    operations.add_argument(
+        "--remove",
+        type=str,
+        metavar="TAG[,TAG...]",
+        help="Remove items from list fields OR remove a label field entirely (comma-separated for lists)",
+    )
+    operations.add_argument(
+        "--set",
+        type=str,
+        metavar="VALUE",
+        help="Set value for label fields (use with --custom-label)",
+    )
+    operations.add_argument(
+        "--dump",
+        action="store_true",
+        help="Report current values of the selected field without modifying",
+    )
 
     # Common options (using common function)
     add_common_args(parser)
@@ -240,20 +266,18 @@ Examples:
     if sum(bool(x) for x in field_options) > 1:
         parser.error("Only one of --categories, --custom-list, or --custom-label can be specified")
 
-    is_label_field = bool(parsed_args.custom_label)
-
     if parsed_args.custom_label:
         field = parsed_args.custom_label
-        field_type = 'label'
+        field_type = "label"
     elif parsed_args.custom_list:
         field = parsed_args.custom_list
-        field_type = 'list'
+        field_type = "list"
     elif parsed_args.categories:
-        field = 'categories'
-        field_type = 'list'
+        field = "categories"
+        field_type = "list"
     else:
-        field = 'tags'
-        field_type = 'list'
+        field = "tags"
+        field_type = "list"
 
     # Validate operations based on field type
     if parsed_args.dump:
@@ -262,10 +286,12 @@ Examples:
             parser.error("Cannot use --dump with --add, --remove, or --set")
     else:
         # Not in dump mode, require modification operations
-        if field_type == 'label':
+        if field_type == "label":
             # For labels, we need either --set or --remove
             if not any([parsed_args.set, parsed_args.remove]):
-                parser.error("For label fields, at least one operation is required (--set or --remove)")
+                parser.error(
+                    "For label fields, at least one operation is required (--set or --remove)"
+                )
             if parsed_args.add:
                 parser.error("Cannot use --add with label fields. Use --set instead.")
         else:
@@ -291,8 +317,8 @@ Examples:
         title_pattern=parsed_args.title,
         from_date=parsed_args.fromdate,
         to_date=parsed_args.todate,
-        text_pattern=getattr(parsed_args, 'text', None),
-        paths=parsed_args.path
+        text_pattern=getattr(parsed_args, "text", None),
+        paths=parsed_args.path,
     )
 
     print(f"Selected {len(selected_posts)} posts")
@@ -308,7 +334,7 @@ Examples:
         return 0
 
     # Modify posts based on field type
-    if field_type == 'label':
+    if field_type == "label":
         # Handle label (single-value) fields
         if parsed_args.set:
             print(f"Setting {field}: '{parsed_args.set}'")
@@ -321,12 +347,12 @@ Examples:
             field,
             set_value=parsed_args.set,
             remove=bool(parsed_args.remove),
-            dry_run=parsed_args.dry_run
+            dry_run=parsed_args.dry_run,
         )
     else:
         # Handle list fields
-        add_items = set(parsed_args.add.split(',')) if parsed_args.add else set()
-        remove_items = set(parsed_args.remove.split(',')) if parsed_args.remove else set()
+        add_items = set(parsed_args.add.split(",")) if parsed_args.add else set()
+        remove_items = set(parsed_args.remove.split(",")) if parsed_args.remove else set()
 
         # Strip whitespace
         add_items = {item.strip() for item in add_items}
@@ -339,11 +365,7 @@ Examples:
         print()
 
         modified_count = manager.modify_metadata(
-            selected_posts,
-            field,
-            add_items,
-            remove_items,
-            dry_run=parsed_args.dry_run
+            selected_posts, field, add_items, remove_items, dry_run=parsed_args.dry_run
         )
 
     print()
@@ -357,5 +379,5 @@ Examples:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(run())

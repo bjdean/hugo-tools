@@ -1,11 +1,8 @@
 """Tests for WordPress import command."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
+
 from hugotools.commands.import_wordpress import (
-    WordPressPost,
     clean_html_entities,
     convert_code_blocks,
     convert_images,
@@ -30,9 +27,9 @@ def test_convert_code_blocks():
 """
     result, code_blocks = convert_code_blocks(html)
 
-    assert '___CODEBLOCK_0___' in result
+    assert "___CODEBLOCK_0___" in result
     assert len(code_blocks) == 1
-    assert '```python' in code_blocks[0]
+    assert "```python" in code_blocks[0]
     assert 'print("hello")' in code_blocks[0]
 
 
@@ -41,7 +38,7 @@ def test_convert_images():
     html = '<p>Text <img src="image.jpg" alt="My Image"> more text</p>'
     result = convert_images(html)
 
-    assert '![My Image](image.jpg)' in result
+    assert "![My Image](image.jpg)" in result
 
 
 def test_detect_stray_html():
@@ -58,12 +55,13 @@ Normal content here.
 <div>This is a problem</div>
 """
     tags = detect_stray_html(markdown)
-    assert 'div' in tags
+    assert "div" in tags
     # Brackets in code blocks should be ignored
 
 
 def test_generate_filename():
     """Test filename generation."""
+
     # Mock WordPressPost object
     class MockPost:
         def __init__(self):
@@ -78,6 +76,7 @@ def test_generate_filename():
 
 def test_generate_filename_from_title():
     """Test filename generation from title when post_name missing."""
+
     class MockPost:
         def __init__(self):
             self.post_name = ""
@@ -89,5 +88,5 @@ def test_generate_filename_from_title():
     assert filename == "hello-world-2023.md"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

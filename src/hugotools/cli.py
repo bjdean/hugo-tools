@@ -7,6 +7,7 @@ Provides a unified command-line interface for Hugo site management tools.
 
 import argparse
 import sys
+
 from hugotools.version import __version__
 
 
@@ -34,21 +35,14 @@ Examples:
 
 For help on a specific command:
   hugotools <command> --help
-        """
+        """,
     )
 
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'%(prog)s {__version__}'
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     # Create subparsers for commands
     subparsers = parser.add_subparsers(
-        dest='command',
-        title='commands',
-        description='Available commands',
-        help='Command to run'
+        dest="command", title="commands", description="Available commands", help="Command to run"
     )
 
     # Import command modules (lazy import to speed up CLI startup)
@@ -56,24 +50,16 @@ For help on a specific command:
 
     # datetime command
     subparsers.add_parser(
-        'datetime',
-        help='Synchronize file modification times with frontmatter dates',
-        add_help=False  # We'll let the command module handle its own help
+        "datetime",
+        help="Synchronize file modification times with frontmatter dates",
+        add_help=False,  # We'll let the command module handle its own help
     )
 
     # tag command
-    subparsers.add_parser(
-        'tag',
-        help='Manage tags, categories, and other metadata',
-        add_help=False
-    )
+    subparsers.add_parser("tag", help="Manage tags, categories, and other metadata", add_help=False)
 
     # import command
-    subparsers.add_parser(
-        'import',
-        help='Import content from external sources',
-        add_help=False
-    )
+    subparsers.add_parser("import", help="Import content from external sources", add_help=False)
 
     # Parse only the command name first
     args, remaining = parser.parse_known_args()
@@ -84,16 +70,19 @@ For help on a specific command:
         return 0
 
     # Route to appropriate command module
-    if args.command == 'datetime':
+    if args.command == "datetime":
         from hugotools.commands.datetime import run
+
         return run(remaining)
 
-    elif args.command == 'tag':
+    elif args.command == "tag":
         from hugotools.commands.tag import run
+
         return run(remaining)
 
-    elif args.command == 'import':
+    elif args.command == "import":
         from hugotools.commands.import_wordpress import run
+
         return run(remaining)
 
     else:
@@ -101,5 +90,5 @@ For help on a specific command:
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

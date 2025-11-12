@@ -1,10 +1,11 @@
 """Tests for common Hugo post handling utilities."""
 
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
+
 from hugotools.common import HugoPost, HugoPostManager
 
 
@@ -22,7 +23,7 @@ categories:
 
 This is the post content.
 """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(content)
         temp_path = Path(f.name)
 
@@ -31,8 +32,8 @@ This is the post content.
 
         assert post.has_frontmatter
         assert post.get_title() == "Test Post"
-        assert post.get_metadata_list('tags') == ['python', 'testing']
-        assert post.get_metadata_list('categories') == ['Technology']
+        assert post.get_metadata_list("tags") == ["python", "testing"]
+        assert post.get_metadata_list("categories") == ["Technology"]
         assert "This is the post content." in post.content
 
         # Test date parsing
@@ -50,7 +51,7 @@ def test_hugo_post_no_frontmatter():
     """Test handling posts without frontmatter."""
     content = "Just plain markdown content."
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(content)
         temp_path = Path(f.name)
 
@@ -75,7 +76,7 @@ tags:
 
 Content here.
 """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(content)
         temp_path = Path(f.name)
 
@@ -83,15 +84,15 @@ Content here.
         post = HugoPost(temp_path)
 
         # Add tags
-        tags = post.get_metadata_list('tags')
-        tags.append('new-tag')
-        post.set_metadata_list('tags', tags)
+        tags = post.get_metadata_list("tags")
+        tags.append("new-tag")
+        post.set_metadata_list("tags", tags)
         post.save()
 
         # Re-read and verify
         post2 = HugoPost(temp_path)
-        assert 'original' in post2.get_metadata_list('tags')
-        assert 'new-tag' in post2.get_metadata_list('tags')
+        assert "original" in post2.get_metadata_list("tags")
+        assert "new-tag" in post2.get_metadata_list("tags")
 
     finally:
         temp_path.unlink()
@@ -100,77 +101,87 @@ Content here.
 def test_hugo_post_manager_loading():
     """Test loading multiple posts."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        content_dir = Path(tmpdir) / 'posts'
+        content_dir = Path(tmpdir) / "posts"
         content_dir.mkdir()
 
         # Create test posts
         for i in range(3):
-            post_file = content_dir / f'post{i}.md'
-            post_file.write_text(f"""---
+            post_file = content_dir / f"post{i}.md"
+            post_file.write_text(
+                f"""---
 title: Post {i}
 date: 2023-01-{i+1:02d}
 ---
 
 Content {i}
-""")
+"""
+            )
 
         # Create a non-markdown file (should be ignored)
-        (content_dir / 'readme.txt').write_text("Not a post")
+        (content_dir / "readme.txt").write_text("Not a post")
 
         manager = HugoPostManager(content_dir)
         manager.load_posts()
 
         assert len(manager.posts) == 3
         titles = [post.get_title() for post in manager.posts]
-        assert 'Post 0' in titles
-        assert 'Post 1' in titles
-        assert 'Post 2' in titles
+        assert "Post 0" in titles
+        assert "Post 1" in titles
+        assert "Post 2" in titles
 
 
 def test_hugo_post_manager_filtering_by_title():
     """Test filtering posts by title pattern."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        content_dir = Path(tmpdir) / 'posts'
+        content_dir = Path(tmpdir) / "posts"
         content_dir.mkdir()
 
-        (content_dir / 'python-post.md').write_text("""---
+        (content_dir / "python-post.md").write_text(
+            """---
 title: Python Tutorial
 ---
 Content
-""")
-        (content_dir / 'javascript-post.md').write_text("""---
+"""
+        )
+        (content_dir / "javascript-post.md").write_text(
+            """---
 title: JavaScript Guide
 ---
 Content
-""")
+"""
+        )
 
         manager = HugoPostManager(content_dir)
         manager.load_posts()
 
         # Filter by title
-        filtered = manager.filter_posts(title_pattern='python')
+        filtered = manager.filter_posts(title_pattern="python")
         assert len(filtered) == 1
-        assert filtered[0].get_title() == 'Python Tutorial'
+        assert filtered[0].get_title() == "Python Tutorial"
 
 
 def test_hugo_post_manager_filtering_by_date():
     """Test filtering posts by date range."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        content_dir = Path(tmpdir) / 'posts'
+        content_dir = Path(tmpdir) / "posts"
         content_dir.mkdir()
 
-        (content_dir / 'old-post.md').write_text("""---
+        (content_dir / "old-post.md").write_text(
+            """---
 title: Old Post
 date: 2020-01-01
 ---
 Content
-""")
-        (content_dir / 'new-post.md').write_text("""---
+"""
+        )
+        (content_dir / "new-post.md").write_text(
+            """---
 title: New Post
 date: 2023-01-01
 ---
 Content
-""")
+"""
+        )
 
         manager = HugoPostManager(content_dir)
         manager.load_posts()
@@ -179,8 +190,8 @@ Content
         from_date = datetime(2022, 1, 1)
         filtered = manager.filter_posts(from_date=from_date)
         assert len(filtered) == 1
-        assert filtered[0].get_title() == 'New Post'
+        assert filtered[0].get_title() == "New Post"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
