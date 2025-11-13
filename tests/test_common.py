@@ -798,5 +798,140 @@ Content
         assert filtered[0].get_title() == "Old Post"
 
 
+def test_hugo_post_toml_preserves_comments():
+    """Test that TOML comments are preserved when modifying frontmatter."""
+    content = """+++
+title = "Test Post"
+date = "2023-11-13T09:57:46+11:00"
+# This is a comment about tags
+tags = ["python", "tutorial"]
+# Another comment
+categories = ["Tech"]
+author = "John Doe"
+
+# PaperMod specific options
+ShowToc = true
+TocOpen = false
+
+# Cover image (uncomment to use)
+# [cover]
+# image = ""
++++
+
+Content here.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        # Modify tags (add a new tag)
+        current_tags = post.get_metadata_list("tags")
+        current_tags.append("testing")
+        post.set_metadata_list("tags", current_tags)
+        post.save()
+
+        # Read the saved file and verify comments are preserved
+        saved_content = temp_path.read_text()
+
+        # Check that comments are preserved
+        assert "# This is a comment about tags" in saved_content
+        assert "# Another comment" in saved_content
+        assert "# PaperMod specific options" in saved_content
+        assert "# Cover image (uncomment to use)" in saved_content
+
+        # Check that the modification was applied
+        assert "testing" in saved_content
+
+        # Check that original values are still there
+        assert "python" in saved_content
+        assert "tutorial" in saved_content
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_toml_preserves_formatting():
+    """Test that TOML formatting is preserved when modifying frontmatter."""
+    content = """+++
+title = "My Post"
+date = "2023-01-01"
+tags = [
+    "tag1",
+    "tag2",
+]
+categories = ["Cat1"]
++++
+
+Content.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        # Modify categories
+        post.set_metadata_list("categories", ["Cat1", "Cat2"])
+        post.save()
+
+        # Read back and verify
+        post2 = HugoPost(temp_path)
+        categories = post2.get_metadata_list("categories")
+        assert "Cat1" in categories
+        assert "Cat2" in categories
+
+        # Original tags should still be there
+        tags = post2.get_metadata_list("tags")
+        assert "tag1" in tags
+        assert "tag2" in tags
+    finally:
+        temp_path.unlink()
+
+
+def test_hugo_post_toml_add_remove_fields_preserves_comments():
+    """Test that adding and removing fields preserves existing comments."""
+    content = """+++
+title = "Test Post"
+# Important comment
+tags = ["python"]
+
+# Another section
+author = "John Doe"
++++
+
+Content.
+"""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(content)
+        temp_path = Path(f.name)
+
+    try:
+        post = HugoPost(temp_path)
+
+        # Add a new field
+        post.set_metadata_list("categories", ["Tech"])
+
+        # Modify existing field
+        post.set_metadata_list("tags", ["python", "django"])
+
+        post.save()
+
+        # Read the saved file
+        saved_content = temp_path.read_text()
+
+        # Comments should be preserved
+        assert "# Important comment" in saved_content
+        assert "# Another section" in saved_content
+
+        # New value should be there
+        assert "django" in saved_content
+        assert "categories" in saved_content
+    finally:
+        temp_path.unlink()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

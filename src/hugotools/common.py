@@ -15,14 +15,8 @@ from typing import Dict, List, Optional
 
 import yaml
 
-# Import TOML library (tomllib for Python 3.11+, tomli for older versions)
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
-
-# Import TOML writer
-import tomli_w
+# Import tomlkit for style-preserving TOML writing
+import tomlkit
 
 
 class HugoPost:
@@ -35,6 +29,7 @@ class HugoPost:
         self.frontmatter_raw: str = ""
         self.has_frontmatter: bool = False
         self.frontmatter_format: str = "yaml"  # Track format: yaml, toml, or json
+        self.toml_document = None  # Store tomlkit document to preserve comments
         self._parse()
 
     def _parse(self):
@@ -68,10 +63,14 @@ class HugoPost:
             self.frontmatter_raw = match.group(1)
             self.content = match.group(2)
             try:
-                self.frontmatter = tomllib.loads(self.frontmatter_raw)
+                # Use tomlkit to preserve comments and formatting
+                self.toml_document = tomlkit.loads(self.frontmatter_raw)
+                # Also keep a dict version for easy access
+                self.frontmatter = dict(self.toml_document)
             except Exception as e:
                 print(f"Warning: Failed to parse TOML in {self.file_path}: {e}")
                 self.frontmatter = {}
+                self.toml_document = None
             return
 
         # Try JSON frontmatter (starts with { and ends with })
@@ -161,9 +160,14 @@ class HugoPost:
             )
             delimiter = "---"
         elif self.frontmatter_format == "toml":
-            # Convert datetime objects to ISO format for TOML
-            frontmatter_copy = self._prepare_for_toml(self.frontmatter)
-            frontmatter_str = tomli_w.dumps(frontmatter_copy)
+            # Use tomlkit to preserve comments and formatting
+            if self.toml_document is not None:
+                # Update the tomlkit document with any changes from self.frontmatter
+                self._update_toml_document()
+                frontmatter_str = tomlkit.dumps(self.toml_document)
+            else:
+                # Fallback if toml_document is not available
+                frontmatter_str = tomlkit.dumps(self.frontmatter)
             delimiter = "+++"
         elif self.frontmatter_format == "json":
             frontmatter_str = json.dumps(self.frontmatter, indent=2, ensure_ascii=False)
@@ -187,6 +191,23 @@ class HugoPost:
             f.write(frontmatter_str)
             f.write(f"{delimiter}\n")
             f.write(self.content)
+
+    def _update_toml_document(self):
+        """Update the tomlkit document with changes from self.frontmatter."""
+        if self.toml_document is None:
+            return
+
+        # Get keys that exist in both
+        doc_keys = set(self.toml_document.keys())
+        fm_keys = set(self.frontmatter.keys())
+
+        # Update existing keys and add new keys
+        for key in fm_keys:
+            self.toml_document[key] = self.frontmatter[key]
+
+        # Remove keys that are no longer in frontmatter
+        for key in doc_keys - fm_keys:
+            del self.toml_document[key]
 
     def _prepare_for_toml(self, data):
         """Prepare data for TOML serialization by converting datetime objects."""
