@@ -302,7 +302,17 @@ Content.
 
         from hugotools.commands.tag import run
 
-        result = run(["--all", "--categories", "--add", "Programming", "--content-dir", str(content_dir), "--dry-run"])
+        result = run(
+            [
+                "--all",
+                "--categories",
+                "--add",
+                "Programming",
+                "--content-dir",
+                str(content_dir),
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
 
@@ -324,7 +334,18 @@ Content.
 
         from hugotools.commands.tag import run
 
-        result = run(["--all", "--custom-label", "author", "--set", "John Doe", "--content-dir", str(content_dir), "--dry-run"])
+        result = run(
+            [
+                "--all",
+                "--custom-label",
+                "author",
+                "--set",
+                "John Doe",
+                "--content-dir",
+                str(content_dir),
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
 
@@ -337,7 +358,18 @@ def test_tag_run_conflicting_field_options():
         from hugotools.commands.tag import run
 
         with pytest.raises(SystemExit) as exc_info:
-            run(["--all", "--categories", "--custom-list", "keywords", "--add", "test", "--content-dir", str(content_dir)])
+            run(
+                [
+                    "--all",
+                    "--categories",
+                    "--custom-list",
+                    "keywords",
+                    "--add",
+                    "test",
+                    "--content-dir",
+                    str(content_dir),
+                ]
+            )
         assert exc_info.value.code != 0
 
 
@@ -350,7 +382,17 @@ def test_tag_run_label_with_add_error():
         from hugotools.commands.tag import run
 
         with pytest.raises(SystemExit) as exc_info:
-            run(["--all", "--custom-label", "status", "--add", "published", "--content-dir", str(content_dir)])
+            run(
+                [
+                    "--all",
+                    "--custom-label",
+                    "status",
+                    "--add",
+                    "published",
+                    "--content-dir",
+                    str(content_dir),
+                ]
+            )
         assert exc_info.value.code != 0
 
 
@@ -441,8 +483,443 @@ Content
         from hugotools.commands.tag import run
 
         # Should handle missing values gracefully
-        result = run(["--all", "--custom-label", "author", "--dump", "--content-dir", str(content_dir)])
+        result = run(
+            ["--all", "--custom-label", "author", "--dump", "--content-dir", str(content_dir)]
+        )
         assert result == 0
+
+
+def test_tag_copy_list_fields():
+    """Test copying from one list field to another."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+categories:
+  - Tech
+  - Programming
+tags:
+  - python
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="categories",
+            source_type="list",
+            dest_field="tags",
+            dest_type="list",
+            move=False,
+            dry_run=False,
+        )
+
+        assert modified == 1
+
+        # Re-read and verify
+        manager2 = HugoTagManager(content_dir)
+        manager2.load_posts()
+        tags = manager2.posts[0].get_metadata_list("tags")
+        categories = manager2.posts[0].get_metadata_list("categories")
+
+        # Tags should have original + copied values
+        assert "python" in tags
+        assert "Tech" in tags
+        assert "Programming" in tags
+
+        # Categories should be unchanged (copy, not move)
+        assert "Tech" in categories
+        assert "Programming" in categories
+
+
+def test_tag_move_list_fields():
+    """Test moving from one list field to another."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+categories:
+  - Tech
+  - Programming
+tags:
+  - python
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="categories",
+            source_type="list",
+            dest_field="tags",
+            dest_type="list",
+            move=True,
+            dry_run=False,
+        )
+
+        assert modified == 1
+
+        # Re-read and verify
+        manager2 = HugoTagManager(content_dir)
+        manager2.load_posts()
+        tags = manager2.posts[0].get_metadata_list("tags")
+        categories = manager2.posts[0].get_metadata_list("categories")
+
+        # Tags should have original + moved values
+        assert "python" in tags
+        assert "Tech" in tags
+        assert "Programming" in tags
+
+        # Categories should be empty (moved)
+        assert len(categories) == 0
+
+
+def test_tag_copy_label_fields():
+    """Test copying from one label field to another."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+author: John Doe
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="author",
+            source_type="label",
+            dest_field="editor",
+            dest_type="label",
+            move=False,
+            dry_run=False,
+        )
+
+        assert modified == 1
+
+        # Re-read and verify
+        manager2 = HugoTagManager(content_dir)
+        manager2.load_posts()
+        author = manager2.posts[0].get_metadata_label("author")
+        editor = manager2.posts[0].get_metadata_label("editor")
+
+        # Both should have the value (copy, not move)
+        assert author == "John Doe"
+        assert editor == "John Doe"
+
+
+def test_tag_move_label_fields():
+    """Test moving from one label field to another."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+author: John Doe
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="author",
+            source_type="label",
+            dest_field="editor",
+            dest_type="label",
+            move=True,
+            dry_run=False,
+        )
+
+        assert modified == 1
+
+        # Re-read and verify
+        manager2 = HugoTagManager(content_dir)
+        manager2.load_posts()
+        author = manager2.posts[0].get_metadata_label("author")
+        editor = manager2.posts[0].get_metadata_label("editor")
+
+        # Author should be removed, editor should have the value
+        assert author is None
+        assert editor == "John Doe"
+
+
+def test_tag_copy_incompatible_types_error():
+    """Test error when trying to copy between incompatible field types."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+categories:
+  - Tech
+author: John Doe
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        # Try to copy from list to label - should raise ValueError
+        with pytest.raises(ValueError) as exc_info:
+            manager.copy_or_move_metadata(
+                manager.posts,
+                source_field="categories",
+                source_type="list",
+                dest_field="author",
+                dest_type="label",
+                move=False,
+                dry_run=False,
+            )
+
+        assert "Cannot copy/move between different field types" in str(exc_info.value)
+
+
+def test_tag_copy_dry_run():
+    """Test copy in dry run mode doesn't modify files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        original_content = """---
+title: Test Post
+categories:
+  - Tech
+tags:
+  - python
+---
+
+Content.
+"""
+        post_file.write_text(original_content)
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="categories",
+            source_type="list",
+            dest_field="tags",
+            dest_type="list",
+            move=False,
+            dry_run=True,
+        )
+
+        assert modified == 1
+
+        # Verify file was not modified
+        assert post_file.read_text() == original_content
+
+
+def test_tag_copy_empty_source():
+    """Test copy with empty source field doesn't modify anything."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+tags:
+  - python
+---
+
+Content.
+"""
+        )
+
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+
+        # Try to copy from categories (which doesn't exist) to tags
+        modified = manager.copy_or_move_metadata(
+            manager.posts,
+            source_field="categories",
+            source_type="list",
+            dest_field="tags",
+            dest_type="list",
+            move=False,
+            dry_run=False,
+        )
+
+        # Should not modify anything
+        assert modified == 0
+
+        # Re-read and verify tags unchanged
+        manager2 = HugoTagManager(content_dir)
+        manager2.load_posts()
+        tags = manager2.posts[0].get_metadata_list("tags")
+
+        assert tags == ["python"]
+
+
+def test_tag_run_copy_categories_to_tags():
+    """Test running copy command with categories to tags."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+categories:
+  - Tech
+  - Programming
+tags:
+  - python
+---
+
+Content.
+"""
+        )
+
+        from hugotools.commands.tag import run
+
+        result = run(["--all", "--copy", "categories", "--content-dir", str(content_dir)])
+        assert result == 0
+
+        # Verify the copy worked
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+        tags = manager.posts[0].get_metadata_list("tags")
+        categories = manager.posts[0].get_metadata_list("categories")
+
+        assert "python" in tags
+        assert "Tech" in tags
+        assert "Programming" in tags
+        assert "Tech" in categories
+        assert "Programming" in categories
+
+
+def test_tag_run_move_tags_to_categories():
+    """Test running move command with tags to categories."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        post_file = content_dir / "test-post.md"
+        post_file.write_text(
+            """---
+title: Test Post
+categories:
+  - Tech
+tags:
+  - python
+  - tutorial
+---
+
+Content.
+"""
+        )
+
+        from hugotools.commands.tag import run
+
+        result = run(["--all", "--move", "tags", "--categories", "--content-dir", str(content_dir)])
+        assert result == 0
+
+        # Verify the move worked
+        manager = HugoTagManager(content_dir)
+        manager.load_posts()
+        tags = manager.posts[0].get_metadata_list("tags")
+        categories = manager.posts[0].get_metadata_list("categories")
+
+        # Tags should be empty
+        assert len(tags) == 0
+
+        # Categories should have original + moved values
+        assert "Tech" in categories
+        assert "python" in categories
+        assert "tutorial" in categories
+
+
+def test_tag_run_copy_and_move_error():
+    """Test error when using both --copy and --move."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(
+                [
+                    "--all",
+                    "--copy",
+                    "categories",
+                    "--move",
+                    "tags",
+                    "--content-dir",
+                    str(content_dir),
+                ]
+            )
+        assert exc_info.value.code != 0
+
+
+def test_tag_run_copy_with_add_error():
+    """Test error when using --copy with --add."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        content_dir = Path(tmpdir) / "posts"
+        content_dir.mkdir()
+
+        from hugotools.commands.tag import run
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(
+                [
+                    "--all",
+                    "--copy",
+                    "categories",
+                    "--add",
+                    "test",
+                    "--content-dir",
+                    str(content_dir),
+                ]
+            )
+        assert exc_info.value.code != 0
 
 
 if __name__ == "__main__":

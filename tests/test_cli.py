@@ -1,7 +1,5 @@
 """Tests for CLI entry point and command routing."""
 
-import sys
-from io import StringIO
 from unittest.mock import patch
 
 import pytest
@@ -32,15 +30,20 @@ def test_cli_datetime_command_routing(tmp_path):
 
     # Create a sample post
     post_file = content_dir / "test.md"
-    post_file.write_text("""---
+    post_file.write_text(
+        """---
 title: Test Post
 date: 2023-01-15 10:30:00
 ---
 
 Content here.
-""")
+"""
+    )
 
-    with patch("sys.argv", ["hugotools", "datetime", "--all", "--content-dir", str(content_dir), "--dry-run"]):
+    with patch(
+        "sys.argv",
+        ["hugotools", "datetime", "--all", "--content-dir", str(content_dir), "--dry-run"],
+    ):
         result = main()
         assert result == 0
 
@@ -53,16 +56,30 @@ def test_cli_tag_command_routing(tmp_path):
 
     # Create a sample post
     post_file = content_dir / "test.md"
-    post_file.write_text("""---
+    post_file.write_text(
+        """---
 title: Test Post
 tags:
   - python
 ---
 
 Content here.
-""")
+"""
+    )
 
-    with patch("sys.argv", ["hugotools", "tag", "--all", "--add", "test", "--content-dir", str(content_dir), "--dry-run"]):
+    with patch(
+        "sys.argv",
+        [
+            "hugotools",
+            "tag",
+            "--all",
+            "--add",
+            "test",
+            "--content-dir",
+            str(content_dir),
+            "--dry-run",
+        ],
+    ):
         result = main()
         assert result == 0
 
@@ -98,7 +115,10 @@ def test_cli_import_command_routing(tmp_path):
 
     output_dir = tmp_path / "output"
 
-    with patch("sys.argv", ["hugotools", "import", str(xml_file), "--output-dir", str(output_dir), "--dry-run"]):
+    with patch(
+        "sys.argv",
+        ["hugotools", "import", str(xml_file), "--output-dir", str(output_dir), "--dry-run"],
+    ):
         result = main()
         assert result == 0
 

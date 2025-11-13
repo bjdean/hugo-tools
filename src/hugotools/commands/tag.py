@@ -157,6 +157,124 @@ class HugoTagManager(HugoPostManager):
                 print(f"All values: {sorted(all_values)}")
             print(f"{'='*60}")
 
+    def copy_or_move_metadata(
+        self,
+        posts: List[HugoPost],
+        source_field: str,
+        source_type: str,
+        dest_field: str,
+        dest_type: str,
+        move: bool = False,
+        dry_run: bool = False,
+    ):
+        """Copy or move metadata from one field to another.
+
+        Args:
+            posts: List of posts to modify
+            source_field: Source field name
+            source_type: Source field type ('list' or 'label')
+            dest_field: Destination field name
+            dest_type: Destination field type ('list' or 'label')
+            move: If True, remove from source after copying; if False, just copy
+            dry_run: If True, don't actually modify files
+
+        Raises:
+            ValueError: If source_type and dest_type don't match
+        """
+
+        # Validate field types match
+        if source_type != dest_type:
+            raise ValueError(
+                f"Cannot copy/move between different field types: "
+                f"{source_field} ({source_type}) -> {dest_field} ({dest_type}). "
+                f"List fields can only be copied/moved to other list fields, "
+                f"and label fields can only be copied/moved to other label fields."
+            )
+
+        modified_count = 0
+
+        for post in posts:
+            if source_type == "list":
+                # Handle list fields
+                source_items = set(post.get_metadata_list(source_field))
+                dest_items = set(post.get_metadata_list(dest_field))
+
+                if not source_items:
+                    continue  # Nothing to copy/move
+
+                original_dest = dest_items.copy()
+                original_source = source_items.copy()
+
+                # Copy items to destination
+                dest_items.update(source_items)
+
+                # If moving, clear source
+                if move:
+                    source_items.clear()
+
+                # Check if anything changed
+                dest_changed = dest_items != original_dest
+                source_changed = source_items != original_source
+
+                if dest_changed or source_changed:
+                    modified_count += 1
+
+                    # Show what's changing
+                    status = "[DRY RUN] " if dry_run else ""
+                    operation = "Moving" if move else "Copying"
+                    print(f"{status}{operation} in {post.file_path.name}")
+                    print(f"  {source_field}: {sorted(original_source)} -> {sorted(source_items)}")
+                    print(f"  {dest_field}: {sorted(original_dest)} -> {sorted(dest_items)}")
+
+                    # Save if not dry run
+                    if not dry_run:
+                        post.set_metadata_list(dest_field, sorted(dest_items))
+                        if move:
+                            if source_items:
+                                post.set_metadata_list(source_field, sorted(source_items))
+                            else:
+                                # Remove the field entirely if empty after move
+                                post.set_metadata_list(source_field, [])
+                        post.save()
+
+            else:  # label field
+                # Handle label fields
+                source_value = post.get_metadata_label(source_field)
+                dest_value = post.get_metadata_label(dest_field)
+
+                if source_value is None:
+                    continue  # Nothing to copy/move
+
+                # Copy value to destination
+                new_dest_value = source_value
+                new_source_value = None if move else source_value
+
+                # Check if anything changed
+                dest_changed = new_dest_value != dest_value
+                source_changed = new_source_value != source_value
+
+                if dest_changed or source_changed:
+                    modified_count += 1
+
+                    # Show what's changing
+                    status = "[DRY RUN] " if dry_run else ""
+                    operation = "Moving" if move else "Copying"
+                    print(f"{status}{operation} in {post.file_path.name}")
+                    if move:
+                        print(f"  {source_field}: '{source_value}' -> (removed)")
+                    else:
+                        print(f"  {source_field}: '{source_value}' (unchanged)")
+                    print(f"  {dest_field}: '{dest_value}' -> '{new_dest_value}'")
+
+                    # Save if not dry run
+                    if not dry_run:
+                        post.set_metadata_label(dest_field, new_dest_value)
+                        if move:
+                            post.set_metadata_label(source_field, None)
+                        post.save()
+
+        return modified_count
+
 
 def run(args=None):
     """Run the tag manager command."""
@@ -204,6 +322,18 @@ Examples:
 
   # Dry run to see what would change
   hugotools tag --all --add test --dry-run
+
+  # Copy all categories to tags
+  hugotools tag --all --copy categories
+
+  # Move all tags to categories
+  hugotools tag --all --move tags --categories
+
+  # Copy custom list field to another
+  hugotools tag --all --copy keywords --custom-list topics
+
+  # Move label field to another label field
+  hugotools tag --all --move author --custom-label editor
         """,
     )
 
@@ -248,6 +378,20 @@ Examples:
         help="Set value for label fields (use with --custom-label)",
     )
     operations.add_argument(
+        "--copy",
+        type=str,
+        metavar="SOURCEFIELD",
+        help="Copy values from SOURCEFIELD to the destination field (selected by --categories, --custom-list, or --custom-label). "
+        "Both fields must be the same type (both lists or both labels).",
+    )
+    operations.add_argument(
+        "--move",
+        type=str,
+        metavar="SOURCEFIELD",
+        help="Move values from SOURCEFIELD to the destination field (selected by --categories, --custom-list, or --custom-label). "
+        "Both fields must be the same type (both lists or both labels). Source field will be cleared after move.",
+    )
+    operations.add_argument(
         "--dump",
         action="store_true",
         help="Report current values of the selected field without modifying",
@@ -282,10 +426,24 @@ Examples:
     # Validate operations based on field type
     if parsed_args.dump:
         # In dump mode, we don't need other operations
+        if any(
+            [
+                parsed_args.add,
+                parsed_args.remove,
+                parsed_args.set,
+                parsed_args.copy,
+                parsed_args.move,
+            ]
+        ):
+            parser.error("Cannot use --dump with --add, --remove, --set, --copy, or --move")
+    elif parsed_args.copy or parsed_args.move:
+        # Copy/move mode - validate
+        if parsed_args.copy and parsed_args.move:
+            parser.error("Cannot use both --copy and --move at the same time")
         if any([parsed_args.add, parsed_args.remove, parsed_args.set]):
-            parser.error("Cannot use --dump with --add, --remove, or --set")
+            parser.error("Cannot use --copy or --move with --add, --remove, or --set")
     else:
-        # Not in dump mode, require modification operations
+        # Not in dump or copy/move mode, require modification operations
         if field_type == "label":
             # For labels, we need either --set or --remove
             if not any([parsed_args.set, parsed_args.remove]):
@@ -333,8 +491,45 @@ Examples:
         manager.dump_metadata(selected_posts, field, field_type)
         return 0
 
+    # Handle copy/move mode
+    if parsed_args.copy or parsed_args.move:
+        source_field = parsed_args.copy if parsed_args.copy else parsed_args.move
+        dest_field = field
+        is_move = bool(parsed_args.move)
+
+        # Determine source field type
+        # We need to infer the type based on common Hugo fields
+        # or assume it's the same type as the destination
+        known_list_fields = ["tags", "categories", "keywords", "authors", "series"]
+        known_label_fields = ["author", "title", "date", "draft", "status"]
+
+        if source_field in known_list_fields:
+            source_type = "list"
+        elif source_field in known_label_fields:
+            source_type = "label"
+        else:
+            # Assume same type as destination for custom fields
+            source_type = field_type
+
+        operation = "Moving" if is_move else "Copying"
+        print(f"{operation} from {source_field} ({source_type}) to {dest_field} ({field_type})")
+        print()
+
+        try:
+            modified_count = manager.copy_or_move_metadata(
+                selected_posts,
+                source_field=source_field,
+                source_type=source_type,
+                dest_field=dest_field,
+                dest_type=field_type,
+                move=is_move,
+                dry_run=parsed_args.dry_run,
+            )
+        except ValueError as e:
+            parser.error(str(e))
+
     # Modify posts based on field type
-    if field_type == "label":
+    elif field_type == "label":
         # Handle label (single-value) fields
         if parsed_args.set:
             print(f"Setting {field}: '{parsed_args.set}'")
